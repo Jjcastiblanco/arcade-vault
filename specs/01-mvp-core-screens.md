@@ -1,6 +1,6 @@
 # SPEC 01 — MVP: core screens (library, detail, leaderboard, auth)
 
-> **Status:** approved
+> **Status:** implemented
 > **Depends on:** —
 > **Date:** 2026-08-08
 > **Objective:** Port the four non-game screens (library, game detail, hall of fame, auth) and shared nav/layout from the static `resources/templates/` prototype into a real Next.js App Router implementation, with mock data and fake local auth, excluding the actual playable game screen.
