@@ -22,9 +22,20 @@ No test runner is configured yet.
 ## Architecture
 
 - **Next.js 16.3.0 / React 19.2.8, App Router, TypeScript, Tailwind CSS v4** (via `@tailwindcss/postcss`).
-- `app/` currently holds only the default `create-next-app` scaffold (`layout.tsx`, `page.tsx`, `globals.css`) — the real app is not yet built.
-- `resources/templates/` contains a **static HTML/JSX prototype** (`Arcade Vault.html`, `app.jsx`, `nav.jsx`, `biblioteca.jsx`, `detalle.jsx`, `salon.jsx`, `reproductor.jsx`, `auth.jsx`, `data.jsx`, `styles.css`) written as plain React (global `React`/`ReactDOM`, no JSX build step, hash-based routing via `location.hash`). This is the design/behavior reference for the real Next.js implementation, not code to run as-is — screens map roughly to: `biblioteca` (library/catalog), `detalle` (game detail), `player` (game player + score saving), `auth` (login), `salon` (hall of fame/leaderboard). `data.jsx` holds the mock game catalog (id, title, category, cover, color, best score, plays). When porting a screen into `app/`, treat the matching `resources/templates/*.jsx` file as the spec for markup/behavior, not something to import directly.
+- `app/` holds the real implementation, built spec-by-spec (see `specs/`):
+  - `page.tsx` — home/landing page.
+  - `games/page.tsx`, `games/[id]/page.tsx` — library/catalog and game detail+player.
+  - `leaderboard/page.tsx` — hall of fame.
+  - `login/page.tsx` — auth screen.
+  - `about/page.tsx` — About + Contact page (hero, highlight row, divider, contact form with client-side validation, loading/success/error states).
+  - `api/contact/route.ts` — POST route handler; validates payload server-side and sends the contact message via the Resend SDK (`resend` npm package). Reads `RESEND_API_KEY`/`CONTACT_EMAIL` from env — never exposed client-side. See `.env.example` for the required variables (`.env.local` is gitignored).
+  - `components/nav.tsx` — shared nav (desktop + mobile slide-in panel), active-link state driven by `usePathname`.
+  - `providers/session-provider.tsx` — client-side session/auth context.
+  - `globals.css` — single stylesheet, hand-ported from the prototype's `styles.css` per spec/screen (no CSS modules).
+- `lib/data.ts` — mock game catalog; `lib/session.ts` — session helpers.
+- `resources/templates/` contains **static HTML/JSX prototypes** (multiple subfolders, e.g. `home-about/`) written as plain React (global `React`/`ReactDOM`, no JSX build step, hash-based routing via `location.hash`). These are the design/behavior reference for each screen, not code to run as-is or import directly — treat the matching `resources/templates/**/*.jsx` file as the spec for markup/behavior when porting or extending a screen.
 - Path alias `@/*` maps to the repo root (`tsconfig.json`).
+- `specs/` (gitignored) holds the spec-driven workflow docs (`/spec`, `/spec-impl`) tracking what's been implemented and what's next.
 
 ## Critical: this is not stock Next.js
 
