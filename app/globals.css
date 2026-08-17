@@ -1312,3 +1312,59 @@ a { color: inherit; text-decoration: none; }
   .about-contact { padding: 0 16px; }
   .contact-form { padding: 20px; }
 }
+
+/* ===== Game frame (CRT bezel around canvas games) ===== */
+.game-frame {
+  display: inline-block;
+  padding: 18px 18px 12px;
+  background: linear-gradient(180deg, var(--bg-3), var(--bg-2));
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 20px 60px rgba(0, 245, 255, 0.08),
+    inset 0 0 40px rgba(0, 245, 255, 0.04);
+}
+.game-frame-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 0 4px 14px;
+}
+.game-frame-stats { display: flex; gap: 22px; flex-wrap: wrap; }
+.game-frame-stats .l {
+  font-family: var(--pixel);
+  font-size: 8px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.game-frame-stats .v {
+  font-family: var(--pixel);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  margin-top: 3px;
+}
+.game-frame-lives { display: flex; gap: 3px; font-size: 12px; }
+.game-frame-buttons { display: flex; gap: 8px; }
+.game-frame-buttons .btn { padding: 8px 14px; font-size: 10px; }
+.game-frame-screen {
+  border: 1px solid #222;
+  border-radius: 4px;
+  overflow: hidden;
+  line-height: 0;
+}
+.game-frame-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 4px 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+.game-frame-signal { color: var(--green); }
