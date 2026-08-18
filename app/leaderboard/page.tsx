@@ -19,12 +19,13 @@ export default function HallOfFame() {
 
   function selectTab(id: string) {
     setTab(id);
-  }
-
-  useEffect(() => {
+    setRows([]);
     setLoading(true);
     setError(false);
     setBest(null);
+  }
+
+  useEffect(() => {
     let cancelled = false;
     getTopScores(tab, 12)
       .then((data) => {
@@ -42,10 +43,7 @@ export default function HallOfFame() {
   }, [tab]);
 
   useEffect(() => {
-    if (!user) {
-      setBest(null);
-      return;
-    }
+    if (!user) return;
     let cancelled = false;
     getUserBestScore(tab, user.name)
       .then((data) => {
