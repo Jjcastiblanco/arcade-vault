@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { GAMES, seededScores, type ScoreRow } from "@/lib/data";
+import { GAMES, type ScoreRow } from "@/lib/data";
 import { useSession } from "@/app/providers/session-provider";
 import { getTopScores, getUserBestScore } from "@/lib/scores";
 
@@ -10,60 +10,52 @@ export default function HallOfFame() {
   const { user } = useSession();
   const [tab, setTab] = useState(GAMES[0].id);
 
-  const mockRows = useMemo(() => seededScores(tab.length * 23 + 7, 12), [tab]);
   const game = GAMES.find((g) => g.id === tab)!;
-  const youRank = user ? Math.floor(8 + (tab.length % 4)) : null;
-  const youScore = user ? mockRows[5]?.score - 2400 : null;
 
-  const isRocas = tab === "rocas";
-  const [rocasRows, setRocasRows] = useState<ScoreRow[]>([]);
-  const [rocasLoading, setRocasLoading] = useState(true);
-  const [rocasError, setRocasError] = useState(false);
-  const [rocasBest, setRocasBest] = useState<ScoreRow | null>(null);
+  const [rows, setRows] = useState<ScoreRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [best, setBest] = useState<ScoreRow | null>(null);
 
   function selectTab(id: string) {
     setTab(id);
-    if (id === "rocas") {
-      setRocasLoading(true);
-      setRocasError(false);
-      setRocasBest(null);
-    }
+    setRows([]);
+    setLoading(true);
+    setError(false);
+    setBest(null);
   }
 
   useEffect(() => {
-    if (!isRocas) return;
     let cancelled = false;
-    getTopScores("rocas", 12)
+    getTopScores(tab, 12)
       .then((data) => {
-        if (!cancelled) setRocasRows(data);
+        if (!cancelled) setRows(data);
       })
       .catch(() => {
-        if (!cancelled) setRocasError(true);
+        if (!cancelled) setError(true);
       })
       .finally(() => {
-        if (!cancelled) setRocasLoading(false);
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [isRocas]);
+  }, [tab]);
 
   useEffect(() => {
-    if (!isRocas || !user) return;
+    if (!user) return;
     let cancelled = false;
-    getUserBestScore("rocas", user.name)
+    getUserBestScore(tab, user.name)
       .then((data) => {
-        if (!cancelled) setRocasBest(data);
+        if (!cancelled) setBest(data);
       })
       .catch(() => {
-        if (!cancelled) setRocasBest(null);
+        if (!cancelled) setBest(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [isRocas, user]);
-
-  const rows = isRocas ? rocasRows : mockRows;
+  }, [tab, user]);
 
   return (
     <div className="av-hall fade-in">
@@ -148,17 +140,23 @@ export default function HallOfFame() {
           <div>PUNTUACIÓN</div>
           <div>FECHA</div>
         </div>
-        {isRocas && rocasLoading && (
+        {loading && (
           <div className="tr">
             <div className="pl">CARGANDO...</div>
           </div>
         )}
-        {isRocas && rocasError && (
+        {!loading && error && (
           <div className="tr">
             <div className="pl">NO SE PUDIERON CARGAR LOS PUNTAJES.</div>
           </div>
         )}
-        {!(isRocas && rocasLoading) &&
+        {!loading && !error && rows.length === 0 && (
+          <div className="tr">
+            <div className="pl">AUN SIN PUNTUACIONES</div>
+          </div>
+        )}
+        {!loading &&
+          !error &&
           rows.map((r, i) => (
             <div
               key={r.name + i}
@@ -174,64 +172,32 @@ export default function HallOfFame() {
               <div className="dt">{r.date}</div>
             </div>
           ))}
-        {isRocas
-          ? user &&
-            rocasBest && (
-              <>
-                <div className="tr you-label">
-                  ▸ TU MEJOR MARCA EN {game.title}
-                </div>
-                <div
-                  className="tr you"
-                  style={{ animationDelay: `${rows.length * 50 + 50}ms` }}
-                >
-                  <div className="rk" style={{ color: "var(--yellow)" }}>
-                    #{String(rocasBest.rank).padStart(2, "0")}
-                  </div>
-                  <div className="pl" style={{ color: "var(--yellow)" }}>
-                    {user.name}
-                  </div>
-                  <div
-                    className="sc"
-                    style={{
-                      color: "var(--yellow)",
-                      textShadow: "0 0 6px rgba(245,255,0,0.5)",
-                    }}
-                  >
-                    {rocasBest.score.toLocaleString("es-ES")}
-                  </div>
-                  <div className="dt">{rocasBest.date}</div>
-                </div>
-              </>
-            )
-          : user && (
-              <>
-                <div className="tr you-label">
-                  ▸ TU MEJOR MARCA EN {game.title}
-                </div>
-                <div
-                  className="tr you"
-                  style={{ animationDelay: `${rows.length * 50 + 50}ms` }}
-                >
-                  <div className="rk" style={{ color: "var(--yellow)" }}>
-                    #{String(youRank).padStart(2, "0")}
-                  </div>
-                  <div className="pl" style={{ color: "var(--yellow)" }}>
-                    {user.name}
-                  </div>
-                  <div
-                    className="sc"
-                    style={{
-                      color: "var(--yellow)",
-                      textShadow: "0 0 6px rgba(245,255,0,0.5)",
-                    }}
-                  >
-                    {(youScore || 9999).toLocaleString("es-ES")}
-                  </div>
-                  <div className="dt">11/05/2026</div>
-                </div>
-              </>
-            )}
+        {user && best && (
+          <>
+            <div className="tr you-label">▸ TU MEJOR MARCA EN {game.title}</div>
+            <div
+              className="tr you"
+              style={{ animationDelay: `${rows.length * 50 + 50}ms` }}
+            >
+              <div className="rk" style={{ color: "var(--yellow)" }}>
+                #{String(best.rank).padStart(2, "0")}
+              </div>
+              <div className="pl" style={{ color: "var(--yellow)" }}>
+                {user.name}
+              </div>
+              <div
+                className="sc"
+                style={{
+                  color: "var(--yellow)",
+                  textShadow: "0 0 6px rgba(245,255,0,0.5)",
+                }}
+              >
+                {best.score.toLocaleString("es-ES")}
+              </div>
+              <div className="dt">{best.date}</div>
+            </div>
+          </>
+        )}
       </div>
 
       <div style={{ textAlign: "center", marginTop: 32 }}>
