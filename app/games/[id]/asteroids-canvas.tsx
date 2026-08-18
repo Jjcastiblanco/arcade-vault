@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getSession } from "@/lib/session";
+import { submitScore } from "@/lib/scores";
 
 const W = 800;
 const H = 600;
@@ -370,6 +372,7 @@ export default function AsteroidsCanvas({
     let deadTimer: number;
     let powerUpSpawned: boolean;
     let killsSinceSpawn: number;
+    let scoreSubmitted: boolean;
 
     function spawnAsteroids(count: number) {
       const SAFE_DIST = 130;
@@ -391,6 +394,7 @@ export default function AsteroidsCanvas({
       powerUps = [];
       powerUpSpawned = false;
       killsSinceSpawn = 0;
+      scoreSubmitted = false;
       score = 0;
       lives = 3;
       level = 1;
@@ -433,6 +437,13 @@ export default function AsteroidsCanvas({
       lives--;
       if (lives <= 0) {
         state = "gameover";
+        if (!scoreSubmitted) {
+          scoreSubmitted = true;
+          const session = getSession();
+          if (session) {
+            submitScore("rocas", session.name, score).catch(() => {});
+          }
+        }
       } else {
         state = "dead";
         deadTimer = 2;

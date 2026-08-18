@@ -17,7 +17,7 @@ npm run start     # run production build
 npm run lint      # eslint (flat config: eslint.config.mjs)
 ```
 
-No test runner is configured yet.
+No test runner is configured yet. Formatting: Prettier config at `.prettierrc.json` (semicolons on, double quotes, trailing commas).
 
 ## Architecture
 
@@ -25,7 +25,7 @@ No test runner is configured yet.
 - `app/` holds the real implementation, built spec-by-spec (see `specs/`):
   - `page.tsx` — home/landing page.
   - `games/page.tsx`, `games/[id]/page.tsx` — library/catalog and game detail+player.
-  - `leaderboard/page.tsx` — hall of fame.
+  - `leaderboard/page.tsx` — hall of fame, backed by real scores from Supabase (`lib/scores.ts`).
   - `login/page.tsx` — auth screen.
   - `about/page.tsx` — About + Contact page (hero, highlight row, divider, contact form with client-side validation, loading/success/error states).
   - `api/contact/route.ts` — POST route handler; validates payload server-side and sends the contact message via the Resend SDK (`resend` npm package). Reads `RESEND_API_KEY`/`CONTACT_EMAIL` from env — never exposed client-side. See `.env.example` for the required variables (`.env.local` is gitignored).
@@ -33,6 +33,9 @@ No test runner is configured yet.
   - `providers/session-provider.tsx` — client-side session/auth context.
   - `globals.css` — single stylesheet, hand-ported from the prototype's `styles.css` per spec/screen (no CSS modules).
 - `lib/data.ts` — mock game catalog; `lib/session.ts` — session helpers.
+- `lib/scores.ts` — score CRUD against Supabase `scores` table (`submitScore`, `getTopScores`, `getUserBestScore`).
+- `lib/supabase/client.ts`, `lib/supabase/server.ts` — Supabase client factories (browser vs. server).
+- `supabase/migrations/` — SQL migrations (e.g. `0001_scores.sql` creates the `scores` table + RLS policies).
 - `resources/templates/` contains **static HTML/JSX prototypes** (multiple subfolders, e.g. `home-about/`) written as plain React (global `React`/`ReactDOM`, no JSX build step, hash-based routing via `location.hash`). These are the design/behavior reference for each screen, not code to run as-is or import directly — treat the matching `resources/templates/**/*.jsx` file as the spec for markup/behavior when porting or extending a screen.
 - Path alias `@/*` maps to the repo root (`tsconfig.json`).
 - `specs/` (gitignored) holds the spec-driven workflow docs (`/spec`, `/spec-impl`) tracking what's been implemented and what's next.
