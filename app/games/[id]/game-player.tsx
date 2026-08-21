@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import type { Game } from "@/lib/data";
 import GameFrame from "./game-frame";
+import TetrisFrame from "./tetris-frame";
+
+const PLAYABLE_GAMES: Record<string, ComponentType<{ onExit: () => void }>> = {
+  rocas: GameFrame,
+  caida: TetrisFrame,
+};
 
 export default function GamePlayer({
   game,
@@ -12,11 +18,12 @@ export default function GamePlayer({
   children: ReactNode;
 }) {
   const [playing, setPlaying] = useState(false);
+  const Frame = PLAYABLE_GAMES[game.id];
 
   return (
     <>
-      {game.id === "rocas" && playing ? (
-        <GameFrame onExit={() => setPlaying(false)} />
+      {Frame && playing ? (
+        <Frame onExit={() => setPlaying(false)} />
       ) : (
         <div className="detail-cover">
           <div className={"cover-bg " + game.cover}></div>
@@ -62,7 +69,7 @@ export default function GamePlayer({
           </div>
         </div>
         <div className="detail-actions">
-          {game.id === "rocas" ? (
+          {Frame ? (
             <button className="btn xl pulse" onClick={() => setPlaying(true)}>
               ▶ JUGAR AHORA
             </button>
