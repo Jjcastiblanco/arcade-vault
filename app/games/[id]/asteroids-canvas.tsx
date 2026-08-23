@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getSession } from "@/lib/session";
-import { submitScore } from "@/lib/scores";
 
 const W = 800;
 const H = 600;
@@ -310,13 +308,16 @@ export type AsteroidsHud = { score: number; lives: number; level: number };
 export default function AsteroidsCanvas({
   paused = false,
   onHud,
+  onGameOver,
 }: {
   paused?: boolean;
   onHud?: (hud: AsteroidsHud) => void;
+  onGameOver?: (score: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
   const onHudRef = useRef(onHud);
+  const onGameOverRef = useRef(onGameOver);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -325,6 +326,10 @@ export default function AsteroidsCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useEffect(() => {
+    onGameOverRef.current = onGameOver;
+  }, [onGameOver]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -372,7 +377,6 @@ export default function AsteroidsCanvas({
     let deadTimer: number;
     let powerUpSpawned: boolean;
     let killsSinceSpawn: number;
-    let scoreSubmitted: boolean;
 
     function spawnAsteroids(count: number) {
       const SAFE_DIST = 130;
@@ -394,7 +398,6 @@ export default function AsteroidsCanvas({
       powerUps = [];
       powerUpSpawned = false;
       killsSinceSpawn = 0;
-      scoreSubmitted = false;
       score = 0;
       lives = 3;
       level = 1;
@@ -437,13 +440,7 @@ export default function AsteroidsCanvas({
       lives--;
       if (lives <= 0) {
         state = "gameover";
-        if (!scoreSubmitted) {
-          scoreSubmitted = true;
-          const session = getSession();
-          if (session) {
-            submitScore("rocas", session.name, score).catch(() => {});
-          }
-        }
+        onGameOverRef.current?.(score);
       } else {
         state = "dead";
         deadTimer = 2;
@@ -452,7 +449,6 @@ export default function AsteroidsCanvas({
 
     function update(dt: number) {
       if (state === "gameover") {
-        if (pressed("Space")) initGame();
         particles.forEach((p) => p.update(dt));
         particles = particles.filter((p) => !p.dead);
         reportHud();
@@ -587,12 +583,6 @@ export default function AsteroidsCanvas({
       ship.draw(ctx!);
 
       drawHUD();
-
-      if (state === "gameover")
-        drawOverlay(
-          "GAME OVER",
-          `PUNTAJE: ${score}   —   ESPACIO PARA REINICIAR`,
-        );
 
       if (pausedRef.current && state === "playing")
         drawOverlay("PAUSA", "REANUDA PARA CONTINUAR");
