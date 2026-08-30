@@ -4,10 +4,12 @@ import { useState, type ComponentType, type ReactNode } from "react";
 import type { Game } from "@/lib/data";
 import GameFrame from "./game-frame";
 import TetrisFrame from "./tetris-frame";
+import SnakeFrame from "./snake-frame";
 
 const PLAYABLE_GAMES: Record<string, ComponentType<{ onExit: () => void }>> = {
   rocas: GameFrame,
   caida: TetrisFrame,
+  serpentina: SnakeFrame,
 };
 
 export default function GamePlayer({

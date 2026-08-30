@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getSession } from "@/lib/session";
-import { submitScore } from "@/lib/scores";
 
 const COLS = 10;
 const ROWS = 20;
@@ -80,14 +78,17 @@ export type TetrisHud = { score: number; lines: number; level: number };
 export default function TetrisCanvas({
   paused = false,
   onHud,
+  onGameOver,
 }: {
   paused?: boolean;
   onHud?: (hud: TetrisHud) => void;
+  onGameOver?: (score: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nextCanvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
   const onHudRef = useRef(onHud);
+  const onGameOverRef = useRef(onGameOver);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -96,6 +97,10 @@ export default function TetrisCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useEffect(() => {
+    onGameOverRef.current = onGameOver;
+  }, [onGameOver]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -123,7 +128,6 @@ export default function TetrisCanvas({
     let state: GameState;
     let dropAccum: number;
     let dropInterval: number;
-    let scoreSubmitted: boolean;
 
     function createBoard(): number[][] {
       return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -239,13 +243,7 @@ export default function TetrisCanvas({
 
     function endGame() {
       state = "gameover";
-      if (!scoreSubmitted) {
-        scoreSubmitted = true;
-        const session = getSession();
-        if (session) {
-          submitScore("caida", session.name, score).catch(() => {});
-        }
-      }
+      onGameOverRef.current?.(score);
     }
 
     function drawBlock(
@@ -321,20 +319,7 @@ export default function TetrisCanvas({
             BLOCK,
           );
 
-      if (state === "gameover") {
-        ctx!.fillStyle = "rgba(10,10,20,0.75)";
-        ctx!.fillRect(0, 0, W, H);
-        ctx!.textAlign = "center";
-        ctx!.fillStyle = "#e57373";
-        ctx!.font = "bold 24px monospace";
-        ctx!.fillText("GAME OVER", W / 2, H / 2 - 20);
-        ctx!.fillStyle = "#7aa2f7";
-        ctx!.font = "14px monospace";
-        ctx!.fillText(`PUNTUACIÓN: ${score}`, W / 2, H / 2 + 8);
-        ctx!.fillStyle = "rgba(255,255,255,0.65)";
-        ctx!.font = "12px monospace";
-        ctx!.fillText("ESPACIO PARA REINICIAR", W / 2, H / 2 + 32);
-      } else if (pausedRef.current) {
+      if (pausedRef.current && state !== "gameover") {
         ctx!.fillStyle = "rgba(10,10,20,0.75)";
         ctx!.fillRect(0, 0, W, H);
         ctx!.textAlign = "center";
@@ -376,7 +361,6 @@ export default function TetrisCanvas({
       level = 1;
       dropInterval = 1000;
       dropAccum = 0;
-      scoreSubmitted = false;
       next = randomPiece();
       spawn();
       state = "playing";
@@ -385,10 +369,7 @@ export default function TetrisCanvas({
     const onKeyDown = (e: KeyboardEvent) => {
       if (GAME_KEYS.has(e.code)) e.preventDefault();
 
-      if (state === "gameover") {
-        if (e.code === "Space") init();
-        return;
-      }
+      if (state === "gameover") return;
       if (pausedRef.current) return;
 
       switch (e.code) {

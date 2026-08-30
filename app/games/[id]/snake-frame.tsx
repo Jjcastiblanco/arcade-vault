@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { useSession } from "@/app/providers/session-provider";
 import { submitScore } from "@/lib/scores";
-import AsteroidsCanvas, { type AsteroidsHud } from "./asteroids-canvas";
+import SnakeCanvas, { type SnakeHud } from "./snake-canvas";
 import GameOverModal from "./game-over-modal";
 
-const INITIAL_HUD: AsteroidsHud = { score: 0, lives: 3, level: 1 };
+const INITIAL_HUD: SnakeHud = { score: 0, length: 3, level: 1 };
 
-export default function GameFrame({ onExit }: { onExit: () => void }) {
+export default function SnakeFrame({ onExit }: { onExit: () => void }) {
   const { user, signIn } = useSession();
   const [paused, setPaused] = useState(false);
-  const [hud, setHud] = useState<AsteroidsHud>(INITIAL_HUD);
+  const [hud, setHud] = useState<SnakeHud>(INITIAL_HUD);
   const [runId, setRunId] = useState(0);
   const [over, setOver] = useState<number | null>(null);
 
@@ -28,14 +28,8 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
             <div className="v">{hud.score}</div>
           </div>
           <div>
-            <div className="l">Vidas</div>
-            <div className="v game-frame-lives">
-              {Array.from({ length: hud.lives }).map((_, i) => (
-                <span key={i} className="neon-magenta">
-                  ♥
-                </span>
-              ))}
-            </div>
+            <div className="l">Longitud</div>
+            <div className="v neon-magenta">{hud.length}</div>
           </div>
           <div>
             <div className="l">Nivel</div>
@@ -49,16 +43,13 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
             {paused ? "▶ REANUDAR" : "❚❚ PAUSA"}
           </button>
           <button className="btn ghost lg" onClick={onExit}>
-            ✕ FIN
-          </button>
-          <button className="btn ghost lg" onClick={onExit}>
             ✕ SALIR
           </button>
         </div>
       </div>
 
       <div className="game-frame-screen">
-        <AsteroidsCanvas
+        <SnakeCanvas
           key={runId}
           paused={paused}
           onHud={setHud}
@@ -68,7 +59,7 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
 
       <div className="game-frame-status">
         <span className="game-frame-signal">● SEÑAL OK</span>
-        <span>ASTEROIDS · CRT-01 · 60 HZ</span>
+        <span>SNAKE · CRT-01 · 60 HZ</span>
         <span>CARGA · 1MB</span>
       </div>
 
@@ -77,7 +68,7 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
           score={over}
           defaultName={user?.name ?? "INVITADO"}
           onSave={(name) => {
-            submitScore("rocas", name, over).catch(() => {});
+            submitScore("serpentina", name, over).catch(() => {});
             if (!user) signIn({ name });
           }}
           onRestart={() => {
