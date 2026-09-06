@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { getSession } from "@/lib/session";
 import { submitScore } from "@/lib/scores";
+import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
 
 const W = 800;
 const H = 600;
@@ -15,6 +16,9 @@ const TRIPLE_SPREAD = 0.18;
 const RADII = [0, 16, 30, 50]; // por tamaño 1, 2, 3
 const SPEEDS = [0, 85, 55, 32]; // velocidad base por tamaño
 const POINTS = [0, 100, 50, 20]; // puntos por tamaño
+
+ 
+let skinTokens: SkinTokens = SKINS.rocas[DEFAULT_SKIN];
 
 const wrap = (v: number, max: number) => ((v % max) + max) % max;
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
@@ -47,7 +51,7 @@ class Bullet {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = skinTokens.accent;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
@@ -105,7 +109,9 @@ class Asteroid {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = skinTokens.primary;
+    ctx.shadowColor = skinTokens.primary;
+    ctx.shadowBlur = skinTokens.effect === "glow" ? 8 : 0;
     ctx.lineWidth = 1.5;
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -114,6 +120,7 @@ class Asteroid {
       ctx.lineTo(this.verts[i][0], this.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.restore();
   }
 }
@@ -149,12 +156,12 @@ class PowerUp {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.PI / 4);
-    ctx.strokeStyle = "#0ff";
+    ctx.strokeStyle = skinTokens.accent;
     ctx.lineWidth = 2;
     const r = this.radius * pulse;
     ctx.strokeRect(-r, -r, r * 2, r * 2);
     ctx.restore();
-    ctx.fillStyle = "#0ff";
+    ctx.fillStyle = skinTokens.accent;
     ctx.font = "bold 12px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -240,7 +247,9 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = skinTokens.primary;
+    ctx.shadowColor = skinTokens.primary;
+    ctx.shadowBlur = skinTokens.effect === "glow" ? 8 : 0;
     ctx.lineWidth = 1.5;
     ctx.lineJoin = "round";
 
@@ -251,6 +260,7 @@ class Ship {
     ctx.lineTo(-12, 9); // ala derecha
     ctx.closePath();
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     if (this.thrusting && Math.random() > 0.35) {
       ctx.beginPath();
@@ -310,9 +320,11 @@ export type AsteroidsHud = { score: number; lives: number; level: number };
 export default function AsteroidsCanvas({
   paused = false,
   onHud,
+  skin = SKINS.rocas[DEFAULT_SKIN],
 }: {
   paused?: boolean;
   onHud?: (hud: AsteroidsHud) => void;
+  skin?: SkinTokens;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
@@ -325,6 +337,10 @@ export default function AsteroidsCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useEffect(() => {
+    skinTokens = skin;
+  }, [skin]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -534,7 +550,7 @@ export default function AsteroidsCanvas({
       ctx!.save();
       ctx!.translate(x, y);
       ctx!.rotate(-Math.PI / 2);
-      ctx!.strokeStyle = "#fff";
+      ctx!.strokeStyle = skinTokens.primary;
       ctx!.lineWidth = 1.2;
       ctx!.lineJoin = "round";
       ctx!.beginPath();
@@ -547,8 +563,13 @@ export default function AsteroidsCanvas({
       ctx!.restore();
     }
 
+    function drawScanlines() {
+      ctx!.fillStyle = "rgba(0,0,0,0.15)";
+      for (let y = 0; y < H; y += 4) ctx!.fillRect(0, y, W, 2);
+    }
+
     function drawHUD() {
-      ctx!.fillStyle = "#fff";
+      ctx!.fillStyle = skinTokens.text;
       ctx!.font = "15px monospace";
 
       ctx!.textAlign = "left";
@@ -561,23 +582,25 @@ export default function AsteroidsCanvas({
 
       if (ship.tripleShot > 0) {
         ctx!.textAlign = "left";
-        ctx!.fillStyle = "#0ff";
+        ctx!.fillStyle = skinTokens.accent;
         ctx!.fillText(`3x  ${ship.tripleShot.toFixed(1)}s`, 14, 46);
       }
     }
 
     function drawOverlay(title: string, sub: string) {
       ctx!.textAlign = "center";
-      ctx!.fillStyle = "#fff";
+      ctx!.fillStyle = skinTokens.text;
       ctx!.font = "bold 46px monospace";
       ctx!.fillText(title, W / 2, H / 2 - 18);
       ctx!.font = "18px monospace";
-      ctx!.fillStyle = "rgba(255,255,255,0.65)";
+      ctx!.fillStyle = skinTokens.text;
+      ctx!.globalAlpha = 0.65;
       ctx!.fillText(sub, W / 2, H / 2 + 22);
+      ctx!.globalAlpha = 1;
     }
 
     function draw() {
-      ctx!.fillStyle = "#000";
+      ctx!.fillStyle = skinTokens.background;
       ctx!.fillRect(0, 0, W, H);
 
       particles.forEach((p) => p.draw(ctx!));
@@ -587,6 +610,8 @@ export default function AsteroidsCanvas({
       ship.draw(ctx!);
 
       drawHUD();
+
+      if (skinTokens.effect === "scanlines") drawScanlines();
 
       if (state === "gameover")
         drawOverlay(

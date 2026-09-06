@@ -2,19 +2,15 @@
 
 import { useState } from "react";
 import { useSession } from "@/app/providers/session-provider";
-import AsteroidsCanvas, { type AsteroidsHud } from "./asteroids-canvas";
+import SnakeCanvas, { type SnakeHud } from "./snake-canvas";
 import { SKINS, DEFAULT_SKIN, type SkinId } from "@/lib/skins";
 
-export default function GameFrame({ onExit }: { onExit: () => void }) {
+export default function SnakeFrame({ onExit }: { onExit: () => void }) {
   const { user } = useSession();
   const [paused, setPaused] = useState(false);
-  const [hud, setHud] = useState<AsteroidsHud>({
-    score: 0,
-    lives: 3,
-    level: 1,
-  });
+  const [hud, setHud] = useState<SnakeHud>({ score: 0, length: 3, level: 1 });
   const [skinId, setSkinId] = useState<SkinId>(DEFAULT_SKIN);
-  const skin = SKINS.rocas[skinId];
+  const skin = SKINS.serpentina[skinId];
 
   return (
     <div className="game-frame">
@@ -29,14 +25,8 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
             <div className="v">{hud.score}</div>
           </div>
           <div>
-            <div className="l">Vidas</div>
-            <div className="v game-frame-lives">
-              {Array.from({ length: hud.lives }).map((_, i) => (
-                <span key={i} className="neon-magenta">
-                  ♥
-                </span>
-              ))}
-            </div>
+            <div className="l">Longitud</div>
+            <div className="v neon-magenta">{hud.length}</div>
           </div>
           <div>
             <div className="l">Nivel</div>
@@ -46,7 +36,7 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
           </div>
         </div>
         <div className="game-frame-buttons">
-          {(Object.keys(SKINS.rocas) as SkinId[]).map((id) => (
+          {(Object.keys(SKINS.serpentina) as SkinId[]).map((id) => (
             <button
               key={id}
               className="btn ghost lg"
@@ -57,14 +47,11 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
               }
               onClick={() => setSkinId(id)}
             >
-              {SKINS.rocas[id].label}
+              {SKINS.serpentina[id].label}
             </button>
           ))}
           <button className="btn ghost lg" onClick={() => setPaused((p) => !p)}>
             {paused ? "▶ REANUDAR" : "❚❚ PAUSA"}
-          </button>
-          <button className="btn ghost lg" onClick={onExit}>
-            ✕ FIN
           </button>
           <button className="btn ghost lg" onClick={onExit}>
             ✕ SALIR
@@ -73,12 +60,12 @@ export default function GameFrame({ onExit }: { onExit: () => void }) {
       </div>
 
       <div className="game-frame-screen">
-        <AsteroidsCanvas paused={paused} onHud={setHud} skin={skin} />
+        <SnakeCanvas paused={paused} onHud={setHud} skin={skin} />
       </div>
 
       <div className="game-frame-status">
         <span className="game-frame-signal">● SEÑAL OK</span>
-        <span>ASTEROIDS · CRT-01 · 60 HZ</span>
+        <span>SERPENTINA · CRT-01 · 60 HZ</span>
         <span>CARGA · 1MB</span>
       </div>
     </div>

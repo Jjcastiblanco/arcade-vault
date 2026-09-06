@@ -40,6 +40,10 @@ No test runner is configured yet. Formatting: Prettier config at `.prettierrc.js
 - Path alias `@/*` maps to the repo root (`tsconfig.json`).
 - `specs/` (gitignored) holds the spec-driven workflow docs (`/spec`, `/spec-impl`) tracking what's been implemented and what's next.
 
+## Agents
+
+- `.claude/agents/game-planner.md` — planning-only subagent that decides which game fits the platform (checks `lib/data.ts`, `resources/started-games/`, `specs/`). Does not write implementation code. Reads/writes its own log at `.claude/game-planner/memory.md` before/after every run.
+
 ## Critical: this is not stock Next.js
 
 Per `AGENTS.md`: this Next.js version has breaking changes vs. training data. **Before writing any Next.js code**, check the relevant guide under `node_modules/next/dist/docs/` (`01-app`, `02-guides`, `03-api-reference`, etc.) and follow any deprecation notices found there.

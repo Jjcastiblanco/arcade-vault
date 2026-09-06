@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { getSession } from "@/lib/session";
 import { submitScore } from "@/lib/scores";
+import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
 
 const COLS = 10;
 const ROWS = 20;
@@ -80,14 +81,17 @@ export type TetrisHud = { score: number; lines: number; level: number };
 export default function TetrisCanvas({
   paused = false,
   onHud,
+  skin = SKINS.caida[DEFAULT_SKIN],
 }: {
   paused?: boolean;
   onHud?: (hud: TetrisHud) => void;
+  skin?: SkinTokens;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nextCanvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
   const onHudRef = useRef(onHud);
+  const skinRef = useRef(skin);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -96,6 +100,10 @@ export default function TetrisCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useEffect(() => {
+    skinRef.current = skin;
+  }, [skin]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -260,7 +268,7 @@ export default function TetrisCanvas({
       const color = COLORS[colorIndex] as string;
       context.globalAlpha = alpha ?? 1;
       context.shadowColor = color;
-      context.shadowBlur = 10;
+      context.shadowBlur = skinRef.current.effect === "none" ? 0 : 10;
       context.fillStyle = color;
       context.fillRect(x * size + 2, y * size + 2, size - 4, size - 4);
       context.shadowBlur = 0;
@@ -272,8 +280,13 @@ export default function TetrisCanvas({
       context.globalAlpha = 1;
     }
 
+    function drawScanlines() {
+      ctx!.fillStyle = "rgba(0,0,0,0.15)";
+      for (let y = 0; y < H; y += 4) ctx!.fillRect(0, y, W, 2);
+    }
+
     function drawGrid() {
-      ctx!.strokeStyle = "#22222e";
+      ctx!.strokeStyle = skinRef.current.accent + "33";
       ctx!.lineWidth = 0.5;
       for (let c = 1; c < COLS; c++) {
         ctx!.beginPath();
@@ -290,7 +303,7 @@ export default function TetrisCanvas({
     }
 
     function draw() {
-      ctx!.fillStyle = "#1a1a25";
+      ctx!.fillStyle = skinRef.current.background;
       ctx!.fillRect(0, 0, W, H);
       drawGrid();
 
@@ -342,10 +355,12 @@ export default function TetrisCanvas({
         ctx!.font = "bold 24px monospace";
         ctx!.fillText("PAUSA", W / 2, H / 2);
       }
+
+      if (skinRef.current.effect === "scanlines") drawScanlines();
     }
 
     function drawNext() {
-      nextCtx!.fillStyle = "#1a1a25";
+      nextCtx!.fillStyle = skinRef.current.background;
       nextCtx!.fillRect(0, 0, NEXT_W, NEXT_H);
       const shape = next.shape;
       const offX = Math.floor((4 - shape[0].length) / 2);
