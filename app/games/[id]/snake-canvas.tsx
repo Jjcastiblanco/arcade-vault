@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { getSession } from "@/lib/session";
 import { submitScore } from "@/lib/scores";
 import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { useSwipeDispatch, TouchControls } from "./touch-controls";
 
 const COLS = 20;
 const ROWS = 20;
@@ -51,6 +52,13 @@ export default function SnakeCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useSwipeDispatch(canvasRef, {
+    up: "ArrowUp",
+    down: "ArrowDown",
+    left: "ArrowLeft",
+    right: "ArrowRight",
+  });
 
   useEffect(() => {
     skinRef.current = skin;
@@ -328,11 +336,20 @@ export default function SnakeCanvas({
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={W}
-      height={H}
-      style={{ display: "block", background: "#0a0a12" }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={W}
+        height={H}
+        style={{ display: "block", background: "#0a0a12", touchAction: "none" }}
+      />
+      <TouchControls
+        up={{ code: "ArrowUp", label: "▲" }}
+        down={{ code: "ArrowDown", label: "▼" }}
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        actions={[{ code: "Space", label: "⟳", color: "#4d7dff" }]}
+      />
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { getSession } from "@/lib/session";
 import { submitScore } from "@/lib/scores";
 import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { TouchControls } from "./touch-controls";
 
 const COLS = 10;
 const ROWS = 20;
@@ -462,96 +463,100 @@ export default function TetrisCanvas({
   }, []);
 
   return (
-    <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-      <canvas
-        ref={canvasRef}
-        width={W}
-        height={H}
-        style={{ display: "block", background: "#1a1a25" }}
-      />
-      <div
-        style={{
-          width: 190,
-          display: "flex",
-          flexDirection: "column",
-          gap: 24,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.15em",
-              color: "var(--ink-faint)",
-              marginBottom: 6,
-            }}
-          >
-            SIGUIENTE
+    <>
+      <div className="tetris-layout">
+        <canvas
+          ref={canvasRef}
+          width={W}
+          height={H}
+          style={{ display: "block", background: "#1a1a25" }}
+        />
+        <div className="tetris-sidebar">
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                color: "var(--ink-faint)",
+                marginBottom: 6,
+              }}
+            >
+              SIGUIENTE
+            </div>
+            <canvas
+              ref={nextCanvasRef}
+              width={NEXT_W}
+              height={NEXT_H}
+              style={{
+                display: "block",
+                background: "#1a1a25",
+                border: "1px solid #2a2a3a",
+                borderRadius: 4,
+              }}
+            />
           </div>
-          <canvas
-            ref={nextCanvasRef}
-            width={NEXT_W}
-            height={NEXT_H}
-            style={{
-              display: "block",
-              background: "#1a1a25",
-              border: "1px solid #2a2a3a",
-              borderRadius: 4,
-            }}
-          />
-        </div>
 
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.15em",
-              color: "var(--ink-faint)",
-              marginBottom: 10,
-            }}
-          >
-            CONTROLES
-          </div>
-          <ul
-            style={{
-              listStyle: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              fontSize: 12,
-              color: "#888",
-            }}
-          >
-            {[
-              ["← →", "mover"],
-              ["↑", "rotar"],
-              ["↓", "bajar"],
-              ["Espacio", "caída"],
-            ].map(([key, label]) => (
-              <li
-                key={label}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <kbd
-                  style={{
-                    background: "#22223a",
-                    border: "1px solid #3a3a5a",
-                    borderRadius: 3,
-                    padding: "2px 8px",
-                    fontSize: 11,
-                    color: "#aaa",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                color: "var(--ink-faint)",
+                marginBottom: 10,
+              }}
+            >
+              CONTROLES
+            </div>
+            <ul
+              style={{
+                listStyle: "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                fontSize: 12,
+                color: "#888",
+              }}
+            >
+              {[
+                ["← →", "mover"],
+                ["↑", "rotar"],
+                ["↓", "bajar"],
+                ["Espacio", "caída"],
+              ].map(([key, label]) => (
+                <li
+                  key={label}
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
                 >
-                  {key}
-                </kbd>
-                {label}
-              </li>
-            ))}
-          </ul>
+                  <kbd
+                    style={{
+                      background: "#22223a",
+                      border: "1px solid #3a3a5a",
+                      borderRadius: 3,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      color: "#aaa",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {key}
+                  </kbd>
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
-    </div>
+      <TouchControls
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        down={{ code: "ArrowDown", label: "▼" }}
+        actions={[
+          { code: "ArrowUp", label: "⟳", color: "#4d7dff" },
+          { code: "Space", label: "CAÍDA", color: "#e64545" },
+        ]}
+      />
+    </>
   );
 }

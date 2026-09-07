@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { getSession } from "@/lib/session";
 import { submitScore } from "@/lib/scores";
 import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { TouchControls } from "./touch-controls";
 
 const W = 800;
 const H = 600;
@@ -474,14 +475,27 @@ export default function ArkanoidCanvas({
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    const onMouseMove = (e: MouseEvent) => {
-      if (pausedRef.current) return;
+    const movePaddleToClientX = (clientX: number) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
-      const mouseX = (e.clientX - rect.left) * scaleX;
-      paddle.x = Math.max(0, Math.min(W - paddle.w, mouseX - paddle.w / 2));
+      const x = (clientX - rect.left) * scaleX;
+      paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w / 2));
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (pausedRef.current) return;
+      movePaddleToClientX(e.clientX);
     };
     canvas.addEventListener("mousemove", onMouseMove);
+
+    const onTouchDrag = (e: TouchEvent) => {
+      if (pausedRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      movePaddleToClientX(touch.clientX);
+    };
+    canvas.addEventListener("touchstart", onTouchDrag, { passive: true });
+    canvas.addEventListener("touchmove", onTouchDrag, { passive: true });
 
     let lastTime: number | null = null;
     let rafId: number;
@@ -505,15 +519,24 @@ export default function ArkanoidCanvas({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       canvas.removeEventListener("mousemove", onMouseMove);
+      canvas.removeEventListener("touchstart", onTouchDrag);
+      canvas.removeEventListener("touchmove", onTouchDrag);
     };
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={W}
-      height={H}
-      style={{ display: "block", background: "#0a0a12" }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={W}
+        height={H}
+        style={{ display: "block", background: "#0a0a12", touchAction: "none" }}
+      />
+      <TouchControls
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        actions={[{ code: "Space", label: "⟳", color: "#4d7dff" }]}
+      />
+    </>
   );
 }

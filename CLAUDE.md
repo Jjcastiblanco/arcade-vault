@@ -32,7 +32,9 @@ No test runner is configured yet. Formatting: Prettier config at `.prettierrc.js
   - `components/nav.tsx` — shared nav (desktop + mobile slide-in panel), active-link state driven by `usePathname`.
   - `providers/session-provider.tsx` — client-side session/auth context.
   - `globals.css` — single stylesheet, hand-ported from the prototype's `styles.css` per spec/screen (no CSS modules).
+  - `games/[id]/touch-controls.tsx` — on-screen touch control overlay shared by the canvas games, shown ≤768px viewport (spec `12-mobile-touch-controls.md`).
 - `lib/data.ts` — mock game catalog; `lib/session.ts` — session helpers.
+- `lib/skins.ts` — per-game visual themes (neon/retro/classic); each game ships at least 3 skins.
 - `lib/scores.ts` — score CRUD against Supabase `scores` table (`submitScore`, `getTopScores`, `getUserBestScore`).
 - `lib/supabase/client.ts`, `lib/supabase/server.ts` — Supabase client factories (browser vs. server).
 - `supabase/migrations/` — SQL migrations (e.g. `0001_scores.sql` creates the `scores` table + RLS policies).
@@ -43,6 +45,9 @@ No test runner is configured yet. Formatting: Prettier config at `.prettierrc.js
 ## Agents
 
 - `.claude/agents/game-planner.md` — planning-only subagent that decides which game fits the platform (checks `lib/data.ts`, `resources/started-games/`, `specs/`). Does not write implementation code. Reads/writes its own log at `.claude/game-planner/memory.md` before/after every run.
+- `.claude/agents/game-jam.md` — drafts spec documents (in `specs/game-jam/<game-id>/`) for a game concept the user already defined. Doesn't invent the concept or write implementation code.
+- `.claude/agents/mobile-porter.md` — reviews/fixes mobile responsive layout + touch controls (viewport ≤768px) against `specs/12-mobile-touch-controls.md` without breaking desktop.
+- `.claude/agents/skin-designer.md` — audits the game catalog and ensures each game has ≥3 skins in `lib/skins.ts` (doesn't touch per-game render logic).
 
 ## Critical: this is not stock Next.js
 

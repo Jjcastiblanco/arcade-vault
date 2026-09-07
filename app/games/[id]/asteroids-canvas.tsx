@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { getSession } from "@/lib/session";
 import { submitScore } from "@/lib/scores";
 import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { TouchControls } from "./touch-controls";
 
 const W = 800;
 const H = 600;
@@ -17,7 +18,6 @@ const RADII = [0, 16, 30, 50]; // por tamaño 1, 2, 3
 const SPEEDS = [0, 85, 55, 32]; // velocidad base por tamaño
 const POINTS = [0, 100, 50, 20]; // puntos por tamaño
 
- 
 let skinTokens: SkinTokens = SKINS.rocas[DEFAULT_SKIN];
 
 const wrap = (v: number, max: number) => ((v % max) + max) % max;
@@ -652,12 +652,20 @@ export default function AsteroidsCanvas({
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      id="canvas"
-      width={W}
-      height={H}
-      style={{ display: "block", background: "#000" }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        id="canvas"
+        width={W}
+        height={H}
+        style={{ display: "block", background: "#000" }}
+      />
+      <TouchControls
+        up={{ code: "ArrowUp", label: "▲" }}
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        actions={[{ code: "Space", label: "FUEGO", color: "#e64545" }]}
+      />
+    </>
   );
 }
