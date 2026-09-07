@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getSession } from "@/lib/session";
-import { submitScore } from "@/lib/scores";
 import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
 import { useSwipeDispatch, TouchControls } from "./touch-controls";
 
@@ -14,19 +12,20 @@ const H = ROWS * CELL;
 
 const FRUITS_URL = "/games/serpentina/fruits.png";
 
-// Subconjunto de SPRITE_ATLAS.fruits (resources/started-games/05-snake/snake-assets/sprites.js)
-// copiado literalmente — hoja fruits.png 3790x442, fila y=136..295.
-const FRUIT_ATLAS = [
-  { x: 2786, y: 136, w: 110, h: 160 }, // apple
-  { x: 1066, y: 136, w: 110, h: 160 }, // cherry
-  { x: 894, y: 136, w: 110, h: 160 }, // strawberry
-  { x: 378, y: 136, w: 110, h: 160 }, // grape
-  { x: 186, y: 136, w: 150, h: 160 }, // orange
-  { x: 1734, y: 136, w: 150, h: 160 }, // watermelon
-] as const;
+const FRUIT_ATLAS: Record<
+  string,
+  { x: number; y: number; w: number; h: number }
+> = {
+  apple: { x: 2786, y: 136, w: 110, h: 160 },
+  cherry: { x: 1066, y: 136, w: 110, h: 160 },
+  strawberry: { x: 894, y: 136, w: 110, h: 160 },
+  grape: { x: 378, y: 136, w: 110, h: 160 },
+  orange: { x: 186, y: 136, w: 150, h: 160 },
+  watermelon: { x: 1734, y: 136, w: 150, h: 160 },
+};
+const FRUIT_KINDS = Object.keys(FRUIT_ATLAS);
 
-type Vec = { x: number; y: number };
-type Fruit = { x: number; y: number; kind: number };
+type Cell = { x: number; y: number };
 type GameState = "playing" | "gameover";
 
 export type SnakeHud = { score: number; length: number; level: number };
@@ -35,15 +34,18 @@ export default function SnakeCanvas({
   paused = false,
   onHud,
   skin = SKINS.serpentina?.[DEFAULT_SKIN],
+  onGameOver,
 }: {
   paused?: boolean;
   onHud?: (hud: SnakeHud) => void;
   skin?: SkinTokens;
+  onGameOver?: (score: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
   const onHudRef = useRef(onHud);
   const skinRef = useRef(skin);
+  const onGameOverRef = useRef(onGameOver);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -65,17 +67,21 @@ export default function SnakeCanvas({
   }, [skin]);
 
   useEffect(() => {
+    onGameOverRef.current = onGameOver;
+  }, [onGameOver]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const fruitImg = new Image();
+    const img = new Image();
     let imgLoaded = false;
-    fruitImg.onload = () => {
+    img.onload = () => {
       imgLoaded = true;
     };
-    fruitImg.src = FRUITS_URL;
+    img.src = FRUITS_URL;
 
     const GAME_KEYS = new Set([
       "ArrowLeft",
@@ -85,68 +91,56 @@ export default function SnakeCanvas({
       "Space",
     ]);
 
-    let snake: Vec[]; // cabeza al final del array
-    let dir: Vec;
-    let nextDir: Vec;
-    let fruit: Fruit;
+    let snake: Cell[];
+    let dir: Cell;
+    let nextDir: Cell;
+    let fruit: Cell & { kind: string };
     let score: number;
     let level: number;
-    let eaten: number;
-    let tickInterval: number;
-    let tickAccum: number;
     let state: GameState;
-    let scoreSubmitted: boolean;
+    let tickAccum: number;
+    let tickInterval: number;
+    let eaten: number;
 
-    function randCell(): Vec {
-      let cell: Vec;
-      do {
-        cell = {
-          x: Math.floor(Math.random() * COLS),
-          y: Math.floor(Math.random() * ROWS),
-        };
-      } while (snake.some((s) => s.x === cell.x && s.y === cell.y));
-      return cell;
+    function randCell(): Cell {
+      return {
+        x: Math.floor(Math.random() * COLS),
+        y: Math.floor(Math.random() * ROWS),
+      };
     }
 
     function spawnFruit() {
-      const cell = randCell();
-      fruit = {
-        x: cell.x,
-        y: cell.y,
-        kind: Math.floor(Math.random() * FRUIT_ATLAS.length),
-      };
+      let cell: Cell;
+      do {
+        cell = randCell();
+      } while (snake.some((s) => s.x === cell.x && s.y === cell.y));
+      const kind = FRUIT_KINDS[Math.floor(Math.random() * FRUIT_KINDS.length)];
+      fruit = { ...cell, kind };
     }
 
     function endGame() {
       state = "gameover";
-      if (!scoreSubmitted) {
-        scoreSubmitted = true;
-        const session = getSession();
-        if (session) {
-          submitScore("serpentina", session.name, score).catch(() => {});
-        }
-      }
+      onGameOverRef.current?.(score);
     }
 
     function tick() {
       dir = nextDir;
       const head = snake[snake.length - 1];
-      const newHead: Vec = { x: head.x + dir.x, y: head.y + dir.y };
+      const nx = head.x + dir.x;
+      const ny = head.y + dir.y;
 
-      if (
-        newHead.x < 0 ||
-        newHead.x >= COLS ||
-        newHead.y < 0 ||
-        newHead.y >= ROWS ||
-        snake.some((s) => s.x === newHead.x && s.y === newHead.y)
-      ) {
+      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
+        endGame();
+        return;
+      }
+      if (snake.some((s) => s.x === nx && s.y === ny)) {
         endGame();
         return;
       }
 
-      snake.push(newHead);
+      snake.push({ x: nx, y: ny });
 
-      if (newHead.x === fruit.x && newHead.y === fruit.y) {
+      if (nx === fruit.x && ny === fruit.y) {
         score += 10;
         eaten++;
         if (eaten % 5 === 0) {
@@ -200,40 +194,27 @@ export default function SnakeCanvas({
       ctx!.fillRect(0, 0, W, H);
       drawGrid();
 
+      if (imgLoaded) {
+        const atlas = FRUIT_ATLAS[fruit.kind];
+        ctx!.drawImage(
+          img,
+          atlas.x,
+          atlas.y,
+          atlas.w,
+          atlas.h,
+          fruit.x * CELL + 2,
+          fruit.y * CELL + 2,
+          CELL - 4,
+          CELL - 4,
+        );
+      }
+
       for (let i = 0; i < snake.length; i++) {
         const s = snake[i];
         drawBlock(s.x, s.y, i === snake.length - 1);
       }
 
-      if (imgLoaded) {
-        const atlas = FRUIT_ATLAS[fruit.kind];
-        ctx!.drawImage(
-          fruitImg,
-          atlas.x,
-          atlas.y,
-          atlas.w,
-          atlas.h,
-          fruit.x * CELL,
-          fruit.y * CELL,
-          CELL,
-          CELL,
-        );
-      }
-
-      if (state === "gameover") {
-        ctx!.fillStyle = "rgba(10,10,20,0.75)";
-        ctx!.fillRect(0, 0, W, H);
-        ctx!.textAlign = "center";
-        ctx!.fillStyle = "#e57373";
-        ctx!.font = "bold 24px monospace";
-        ctx!.fillText("GAME OVER", W / 2, H / 2 - 20);
-        ctx!.fillStyle = "#7aa2f7";
-        ctx!.font = "14px monospace";
-        ctx!.fillText(`PUNTUACIÓN: ${score}`, W / 2, H / 2 + 8);
-        ctx!.fillStyle = "rgba(255,255,255,0.65)";
-        ctx!.font = "12px monospace";
-        ctx!.fillText("ESPACIO PARA REINICIAR", W / 2, H / 2 + 32);
-      } else if (pausedRef.current) {
+      if (pausedRef.current && state !== "gameover") {
         ctx!.fillStyle = "rgba(10,10,20,0.75)";
         ctx!.fillRect(0, 0, W, H);
         ctx!.textAlign = "center";
@@ -248,34 +229,33 @@ export default function SnakeCanvas({
     let lastReportedHud: SnakeHud | null = null;
     function reportHud() {
       if (!onHudRef.current) return;
-      const length = snake.length;
+      const hud = { score, length: snake.length, level };
       if (
         lastReportedHud &&
-        lastReportedHud.score === score &&
-        lastReportedHud.length === length &&
-        lastReportedHud.level === level
+        lastReportedHud.score === hud.score &&
+        lastReportedHud.length === hud.length &&
+        lastReportedHud.level === hud.level
       )
         return;
-      lastReportedHud = { score, length, level };
-      onHudRef.current(lastReportedHud);
+      lastReportedHud = hud;
+      onHudRef.current(hud);
     }
 
     function init() {
-      const startX = Math.floor(COLS / 2);
-      const startY = Math.floor(ROWS / 2);
+      const cx = Math.floor(COLS / 2);
+      const cy = Math.floor(ROWS / 2);
       snake = [
-        { x: startX - 2, y: startY },
-        { x: startX - 1, y: startY },
-        { x: startX, y: startY },
+        { x: cx - 2, y: cy },
+        { x: cx - 1, y: cy },
+        { x: cx, y: cy },
       ];
       dir = { x: 1, y: 0 };
-      nextDir = { x: 1, y: 0 };
+      nextDir = dir;
       score = 0;
       level = 1;
       eaten = 0;
       tickInterval = 160;
       tickAccum = 0;
-      scoreSubmitted = false;
       state = "playing";
       spawnFruit();
     }
@@ -283,24 +263,22 @@ export default function SnakeCanvas({
     const onKeyDown = (e: KeyboardEvent) => {
       if (GAME_KEYS.has(e.code)) e.preventDefault();
 
-      if (state === "gameover") {
-        if (e.code === "Space") init();
-        return;
-      }
+      if (state === "gameover") return;
       if (pausedRef.current) return;
 
+      const isReverse = (d: Cell) => d.x === -dir.x && d.y === -dir.y;
       switch (e.code) {
         case "ArrowLeft":
-          if (dir.x === 0) nextDir = { x: -1, y: 0 };
+          if (!isReverse({ x: -1, y: 0 })) nextDir = { x: -1, y: 0 };
           break;
         case "ArrowRight":
-          if (dir.x === 0) nextDir = { x: 1, y: 0 };
+          if (!isReverse({ x: 1, y: 0 })) nextDir = { x: 1, y: 0 };
           break;
         case "ArrowUp":
-          if (dir.y === 0) nextDir = { x: 0, y: -1 };
+          if (!isReverse({ x: 0, y: -1 })) nextDir = { x: 0, y: -1 };
           break;
         case "ArrowDown":
-          if (dir.y === 0) nextDir = { x: 0, y: 1 };
+          if (!isReverse({ x: 0, y: 1 })) nextDir = { x: 0, y: 1 };
           break;
       }
     };
