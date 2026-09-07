@@ -2,21 +2,15 @@
 
 import { useState } from "react";
 import { useSession } from "@/app/providers/session-provider";
-import { submitScore } from "@/lib/scores";
-import TetrisCanvas, { type TetrisHud } from "./tetris-canvas";
+import ArkanoidCanvas, { type ArkanoidHud } from "./arkanoid-canvas";
 import { SKINS, DEFAULT_SKIN, type SkinId } from "@/lib/skins";
-import GameOverModal from "./game-over-modal";
 
-const INITIAL_HUD: TetrisHud = { score: 0, lines: 0, level: 1 };
-
-export default function TetrisFrame({ onExit }: { onExit: () => void }) {
-  const { user, signIn } = useSession();
+export default function ArkanoidFrame({ onExit }: { onExit: () => void }) {
+  const { user } = useSession();
   const [paused, setPaused] = useState(false);
-  const [hud, setHud] = useState<TetrisHud>(INITIAL_HUD);
+  const [hud, setHud] = useState<ArkanoidHud>({ score: 0, lives: 3, level: 1 });
   const [skinId, setSkinId] = useState<SkinId>(DEFAULT_SKIN);
-  const skin = SKINS.caida[skinId];
-  const [runId, setRunId] = useState(0);
-  const [over, setOver] = useState<number | null>(null);
+  const skin = SKINS["bloque-buster"][skinId];
 
   return (
     <div className="game-frame">
@@ -31,8 +25,14 @@ export default function TetrisFrame({ onExit }: { onExit: () => void }) {
             <div className="v">{hud.score}</div>
           </div>
           <div>
-            <div className="l">Líneas</div>
-            <div className="v neon-magenta">{hud.lines}</div>
+            <div className="l">Vidas</div>
+            <div className="v game-frame-lives">
+              {Array.from({ length: hud.lives }).map((_, i) => (
+                <span key={i} className="neon-magenta">
+                  ♥
+                </span>
+              ))}
+            </div>
           </div>
           <div>
             <div className="l">Nivel</div>
@@ -42,7 +42,7 @@ export default function TetrisFrame({ onExit }: { onExit: () => void }) {
           </div>
         </div>
         <div className="game-frame-buttons">
-          {(Object.keys(SKINS.caida) as SkinId[]).map((id) => (
+          {(Object.keys(SKINS["bloque-buster"]) as SkinId[]).map((id) => (
             <button
               key={id}
               className="btn ghost lg"
@@ -53,7 +53,7 @@ export default function TetrisFrame({ onExit }: { onExit: () => void }) {
               }
               onClick={() => setSkinId(id)}
             >
-              {SKINS.caida[id].label}
+              {SKINS["bloque-buster"][id].label}
             </button>
           ))}
           <button className="btn ghost lg" onClick={() => setPaused((p) => !p)}>
@@ -66,37 +66,14 @@ export default function TetrisFrame({ onExit }: { onExit: () => void }) {
       </div>
 
       <div className="game-frame-screen">
-        <TetrisCanvas
-          key={runId}
-          paused={paused}
-          onHud={setHud}
-          skin={skin}
-          onGameOver={setOver}
-        />
+        <ArkanoidCanvas paused={paused} onHud={setHud} skin={skin} />
       </div>
 
       <div className="game-frame-status">
         <span className="game-frame-signal">● SEÑAL OK</span>
-        <span>TETRIS · CRT-01 · 60 HZ</span>
+        <span>BLOQUE BUSTER · CRT-01 · 60 HZ</span>
         <span>CARGA · 1MB</span>
       </div>
-
-      {over !== null && (
-        <GameOverModal
-          score={over}
-          defaultName={user?.name ?? "INVITADO"}
-          onSave={(name) => {
-            submitScore("caida", name, over).catch(() => {});
-            if (!user) signIn({ name });
-          }}
-          onRestart={() => {
-            setOver(null);
-            setHud(INITIAL_HUD);
-            setRunId((id) => id + 1);
-          }}
-          onExit={onExit}
-        />
-      )}
     </div>
   );
 }

@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { useSwipeDispatch, TouchControls } from "./touch-controls";
 
 const COLS = 20;
 const ROWS = 20;
 const CELL = 30;
 const W = COLS * CELL;
 const H = ROWS * CELL;
+
+const FRUITS_URL = "/games/serpentina/fruits.png";
 
 const FRUIT_ATLAS: Record<
   string,
@@ -29,15 +33,18 @@ export type SnakeHud = { score: number; length: number; level: number };
 export default function SnakeCanvas({
   paused = false,
   onHud,
+  skin = SKINS.serpentina?.[DEFAULT_SKIN],
   onGameOver,
 }: {
   paused?: boolean;
   onHud?: (hud: SnakeHud) => void;
+  skin?: SkinTokens;
   onGameOver?: (score: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
   const onHudRef = useRef(onHud);
+  const skinRef = useRef(skin);
   const onGameOverRef = useRef(onGameOver);
 
   useEffect(() => {
@@ -47,6 +54,17 @@ export default function SnakeCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useSwipeDispatch(canvasRef, {
+    up: "ArrowUp",
+    down: "ArrowDown",
+    left: "ArrowLeft",
+    right: "ArrowRight",
+  });
+
+  useEffect(() => {
+    skinRef.current = skin;
+  }, [skin]);
 
   useEffect(() => {
     onGameOverRef.current = onGameOver;
@@ -63,7 +81,7 @@ export default function SnakeCanvas({
     img.onload = () => {
       imgLoaded = true;
     };
-    img.src = "/games/serpentina/fruits.png";
+    img.src = FRUITS_URL;
 
     const GAME_KEYS = new Set([
       "ArrowLeft",
@@ -136,9 +154,9 @@ export default function SnakeCanvas({
     }
 
     function drawBlock(x: number, y: number, isHead: boolean) {
-      const color = isHead ? "#c8ffb0" : "#39ff6a";
+      const color = isHead ? skinRef.current!.accent : skinRef.current!.primary;
       ctx!.shadowColor = color;
-      ctx!.shadowBlur = isHead ? 14 : 8;
+      ctx!.shadowBlur = skinRef.current!.effect === "none" ? 0 : 12;
       ctx!.fillStyle = color;
       ctx!.fillRect(x * CELL + 2, y * CELL + 2, CELL - 4, CELL - 4);
       ctx!.shadowBlur = 0;
@@ -150,7 +168,7 @@ export default function SnakeCanvas({
     }
 
     function drawGrid() {
-      ctx!.strokeStyle = "#22222e";
+      ctx!.strokeStyle = skinRef.current!.accent + "22";
       ctx!.lineWidth = 0.5;
       for (let c = 1; c < COLS; c++) {
         ctx!.beginPath();
@@ -166,8 +184,13 @@ export default function SnakeCanvas({
       }
     }
 
+    function drawScanlines() {
+      ctx!.fillStyle = "rgba(0,0,0,0.15)";
+      for (let y = 0; y < H; y += 4) ctx!.fillRect(0, y, W, 2);
+    }
+
     function draw() {
-      ctx!.fillStyle = "#1a1a25";
+      ctx!.fillStyle = skinRef.current!.background;
       ctx!.fillRect(0, 0, W, H);
       drawGrid();
 
@@ -199,6 +222,8 @@ export default function SnakeCanvas({
         ctx!.font = "bold 24px monospace";
         ctx!.fillText("PAUSA", W / 2, H / 2);
       }
+
+      if (skinRef.current!.effect === "scanlines") drawScanlines();
     }
 
     let lastReportedHud: SnakeHud | null = null;
@@ -289,11 +314,20 @@ export default function SnakeCanvas({
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={W}
-      height={H}
-      style={{ display: "block", background: "#1a1a25" }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        width={W}
+        height={H}
+        style={{ display: "block", background: "#0a0a12", touchAction: "none" }}
+      />
+      <TouchControls
+        up={{ code: "ArrowUp", label: "▲" }}
+        down={{ code: "ArrowDown", label: "▼" }}
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        actions={[{ code: "Space", label: "⟳", color: "#4d7dff" }]}
+      />
+    </>
   );
 }

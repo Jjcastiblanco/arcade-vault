@@ -1,0 +1,542 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { getSession } from "@/lib/session";
+import { submitScore } from "@/lib/scores";
+import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { TouchControls } from "./touch-controls";
+
+const W = 800;
+const H = 600;
+
+const PADDLE_SPEED = 400;
+const BLOCK_COLS = 10;
+const BLOCK_W = 64;
+const BLOCK_H = 24;
+const BLOCKS_ORIGIN_X = (W - BLOCK_COLS * BLOCK_W) / 2;
+const BLOCKS_ORIGIN_Y = 80;
+const BASE_BALL_VX = 200;
+const BASE_BALL_VY = -300;
+const EXPLOSION_DURATION = 300;
+
+type BlockColor =
+  "red" | "yellow" | "cyan" | "magenta" | "hotpink" | "green" | "gray";
+
+const BLOCK_HEX: Record<BlockColor, string> = {
+  red: "#e64545",
+  yellow: "#e8d84d",
+  cyan: "#4de0e8",
+  magenta: "#c14de8",
+  hotpink: "#e84dbf",
+  green: "#5fe85f",
+  gray: "#9e9e9e",
+};
+
+// Niveles portados de resources/started-games/04-arkanoid/levels.js
+type LevelBlock = { col: number; row: number; color: BlockColor };
+type Level = { speed: number; blocks: LevelBlock[] };
+
+const LEVELS: Level[] = (() => {
+  const rowColors1: BlockColor[] = [
+    "red",
+    "yellow",
+    "cyan",
+    "magenta",
+    "hotpink",
+    "green",
+  ];
+  const rowColors2: BlockColor[] = [
+    "gray",
+    "cyan",
+    "hotpink",
+    "yellow",
+    "magenta",
+    "green",
+  ];
+  const rowColors4: BlockColor[] = [
+    "cyan",
+    "magenta",
+    "green",
+    "yellow",
+    "hotpink",
+    "red",
+  ];
+
+  const l1: LevelBlock[] = [];
+  for (let row = 0; row < 6; row++)
+    for (let col = 0; col < 10; col++)
+      l1.push({ col, row, color: rowColors1[row] });
+
+  const l2: LevelBlock[] = [];
+  const pyStart = [4, 3, 2, 1, 0, 0];
+  const pyEnd = [5, 6, 7, 8, 9, 9];
+  for (let row = 0; row < 6; row++)
+    for (let col = pyStart[row]; col <= pyEnd[row]; col++)
+      l2.push({ col, row, color: rowColors2[row] });
+
+  const l3: LevelBlock[] = [];
+  for (let row = 0; row < 6; row++)
+    for (let col = 0; col < 10; col++)
+      if ((col + row) % 2 === 0)
+        l3.push({ col, row, color: row < 3 ? "yellow" : "magenta" });
+
+  const gaps4 = [
+    [2, 5, 8],
+    [0, 4, 7, 9],
+    [1, 3, 6],
+    [2, 5, 8, 9],
+    [0, 4, 7],
+    [1, 3, 6, 9],
+  ];
+  const l4: LevelBlock[] = [];
+  for (let row = 0; row < 6; row++)
+    for (let col = 0; col < 10; col++)
+      if (!gaps4[row].includes(col))
+        l4.push({ col, row, color: rowColors4[row] });
+
+  const l5: LevelBlock[] = [];
+  for (let row = 0; row < 6; row++)
+    for (let col = 0; col < 10; col++) {
+      const isFrame = col === 0 || col === 9 || row === 0 || row === 5;
+      const isCross = col === 4 || row === 2;
+      if (isFrame || isCross)
+        l5.push({
+          col,
+          row,
+          color: isCross && !isFrame ? "hotpink" : "cyan",
+        });
+    }
+
+  return [
+    { speed: 1.0, blocks: l1 },
+    { speed: 1.1, blocks: l2 },
+    { speed: 1.21, blocks: l3 },
+    { speed: 1.33, blocks: l4 },
+    { speed: 1.46, blocks: l5 },
+  ];
+})();
+
+type Block = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: BlockColor;
+  alive: boolean;
+};
+type Explosion = {
+  x: number;
+  y: number;
+  color: BlockColor;
+  elapsed: number;
+  particles: { dx: number; dy: number }[];
+};
+type GameState = "playing" | "gameover" | "win";
+
+export type ArkanoidHud = { score: number; lives: number; level: number };
+
+export default function ArkanoidCanvas({
+  paused = false,
+  onHud,
+  skin = SKINS["bloque-buster"][DEFAULT_SKIN],
+}: {
+  paused?: boolean;
+  onHud?: (hud: ArkanoidHud) => void;
+  skin?: SkinTokens;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pausedRef = useRef(paused);
+  const onHudRef = useRef(onHud);
+  const skinRef = useRef(skin);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    onHudRef.current = onHud;
+  }, [onHud]);
+
+  useEffect(() => {
+    skinRef.current = skin;
+  }, [skin]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let bounceSound: HTMLAudioElement | null = null;
+    let breakSound: HTMLAudioElement | null = null;
+    try {
+      bounceSound = new Audio("/games/bloque-buster/sounds/ball-bounce.mp3");
+      breakSound = new Audio("/games/bloque-buster/sounds/break-sound.mp3");
+    } catch {
+      // audio not available (SSR-safe guard, shouldn't happen inside effect)
+    }
+    function play(sound: HTMLAudioElement | null) {
+      if (!sound) return;
+      try {
+        (sound.cloneNode() as HTMLAudioElement).play().catch(() => {});
+      } catch {
+        // ignore playback failures
+      }
+    }
+
+    const paddle = { x: 0, y: 560, w: 81, h: 14 };
+    const ball = { x: 0, y: 0, w: 16, h: 16, vx: 200, vy: -300 };
+    let blocks: Block[] = [];
+    let explosions: Explosion[] = [];
+    let lives = 3;
+    let score = 0;
+    let gameState: GameState = "playing";
+    let currentLevel = 1;
+    let scoreSubmitted = false;
+
+    const keys: Record<string, boolean> = {
+      ArrowLeft: false,
+      ArrowRight: false,
+    };
+
+    function initPaddle() {
+      paddle.x = (W - paddle.w) / 2;
+    }
+
+    function initBall() {
+      const speed = LEVELS[currentLevel - 1].speed;
+      ball.x = paddle.x + (paddle.w - ball.w) / 2;
+      ball.y = paddle.y - ball.h;
+      ball.vx = BASE_BALL_VX * speed;
+      ball.vy = BASE_BALL_VY * speed;
+    }
+
+    function loadLevel(n: number) {
+      currentLevel = n;
+      const level = LEVELS[n - 1];
+      blocks = level.blocks.map((b) => ({
+        x: BLOCKS_ORIGIN_X + b.col * BLOCK_W,
+        y: BLOCKS_ORIGIN_Y + b.row * BLOCK_H,
+        w: BLOCK_W,
+        h: BLOCK_H,
+        color: b.color,
+        alive: true,
+      }));
+      explosions = [];
+      initBall();
+    }
+
+    function collideAABB(block: Block) {
+      return (
+        ball.x < block.x + block.w &&
+        ball.x + ball.w > block.x &&
+        ball.y < block.y + block.h &&
+        ball.y + ball.h > block.y
+      );
+    }
+
+    function spawnExplosion(block: Block) {
+      const particles = Array.from({ length: 8 }, (_, i) => {
+        const angle = (Math.PI * 2 * i) / 8;
+        return { dx: Math.cos(angle), dy: Math.sin(angle) };
+      });
+      explosions.push({
+        x: block.x + block.w / 2,
+        y: block.y + block.h / 2,
+        color: block.color,
+        elapsed: 0,
+        particles,
+      });
+    }
+
+    function endGame(state: "gameover" | "win") {
+      gameState = state;
+      if (!scoreSubmitted) {
+        scoreSubmitted = true;
+        const session = getSession();
+        if (session) {
+          submitScore("bloque-buster", session.name, score).catch(() => {});
+        }
+      }
+    }
+
+    function init() {
+      lives = 3;
+      score = 0;
+      scoreSubmitted = false;
+      gameState = "playing";
+      initPaddle();
+      loadLevel(1);
+    }
+
+    function update(dt: number) {
+      if (gameState !== "playing") return;
+
+      if (keys.ArrowLeft) paddle.x = Math.max(0, paddle.x - PADDLE_SPEED * dt);
+      if (keys.ArrowRight)
+        paddle.x = Math.min(W - paddle.w, paddle.x + PADDLE_SPEED * dt);
+
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+
+      if (ball.x <= 0) {
+        ball.x = 0;
+        ball.vx = Math.abs(ball.vx);
+        play(bounceSound);
+      }
+      if (ball.x + ball.w >= W) {
+        ball.x = W - ball.w;
+        ball.vx = -Math.abs(ball.vx);
+        play(bounceSound);
+      }
+      if (ball.y <= 0) {
+        ball.y = 0;
+        ball.vy = Math.abs(ball.vy);
+        play(bounceSound);
+      }
+
+      if (
+        ball.vy > 0 &&
+        ball.x + ball.w > paddle.x &&
+        ball.x < paddle.x + paddle.w &&
+        ball.y + ball.h >= paddle.y &&
+        ball.y + ball.h <= paddle.y + paddle.h + 8
+      ) {
+        ball.y = paddle.y - ball.h;
+        ball.vy = -Math.abs(ball.vy);
+        play(bounceSound);
+      }
+
+      for (const block of blocks) {
+        if (!block.alive) continue;
+        if (collideAABB(block)) {
+          block.alive = false;
+          spawnExplosion(block);
+          score += 10;
+          ball.vy = -ball.vy;
+          play(breakSound);
+          if (blocks.every((b) => !b.alive)) {
+            if (currentLevel < 5) loadLevel(currentLevel + 1);
+            else endGame("win");
+          }
+          break;
+        }
+      }
+
+      for (const exp of explosions) exp.elapsed += dt * 1000;
+      explosions = explosions.filter((exp) => exp.elapsed < EXPLOSION_DURATION);
+
+      if (ball.y > H) {
+        lives--;
+        if (lives <= 0) {
+          lives = 0;
+          endGame("gameover");
+        } else {
+          initBall();
+        }
+      }
+    }
+
+    function drawBlock(block: Block) {
+      const color = BLOCK_HEX[block.color];
+      ctx!.save();
+      ctx!.shadowColor = color;
+      ctx!.shadowBlur = skinRef.current.effect === "none" ? 0 : 12;
+      ctx!.fillStyle = color;
+      ctx!.fillRect(block.x + 2, block.y + 2, block.w - 4, block.h - 4);
+      ctx!.shadowBlur = 0;
+      ctx!.fillStyle = "rgba(255,255,255,0.25)";
+      ctx!.fillRect(block.x + 2, block.y + 2, block.w - 4, 5);
+      ctx!.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx!.lineWidth = 1;
+      ctx!.strokeRect(block.x + 2, block.y + 2, block.w - 4, block.h - 4);
+      ctx!.restore();
+    }
+
+    function drawExplosion(exp: Explosion) {
+      const progress = exp.elapsed / EXPLOSION_DURATION;
+      const alpha = Math.max(0, 1 - progress);
+      const dist = progress * 30;
+      const color = BLOCK_HEX[exp.color];
+      ctx!.save();
+      ctx!.globalAlpha = alpha;
+      ctx!.fillStyle = color;
+      ctx!.shadowColor = color;
+      ctx!.shadowBlur = 10;
+      for (const p of exp.particles) {
+        ctx!.beginPath();
+        ctx!.arc(exp.x + p.dx * dist, exp.y + p.dy * dist, 3, 0, Math.PI * 2);
+        ctx!.fill();
+      }
+      ctx!.restore();
+    }
+
+    function drawPaddle() {
+      const skin = skinRef.current;
+      ctx!.save();
+      ctx!.shadowColor = skin.primary;
+      ctx!.shadowBlur = skin.effect === "none" ? 0 : 14;
+      ctx!.fillStyle = skin.primary;
+      ctx!.beginPath();
+      ctx!.roundRect(paddle.x, paddle.y, paddle.w, paddle.h, 6);
+      ctx!.fill();
+      ctx!.restore();
+    }
+
+    function drawBall() {
+      const skin = skinRef.current;
+      ctx!.save();
+      ctx!.shadowColor = skin.accent;
+      ctx!.shadowBlur = skin.effect === "none" ? 0 : 16;
+      ctx!.fillStyle = skin.accent;
+      ctx!.beginPath();
+      ctx!.arc(
+        ball.x + ball.w / 2,
+        ball.y + ball.h / 2,
+        ball.w / 2,
+        0,
+        Math.PI * 2,
+      );
+      ctx!.fill();
+      ctx!.restore();
+    }
+
+    function drawScanlines() {
+      ctx!.fillStyle = "rgba(0,0,0,0.15)";
+      for (let y = 0; y < H; y += 4) ctx!.fillRect(0, y, W, 2);
+    }
+
+    function drawOverlay(message: string) {
+      ctx!.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx!.fillRect(0, 0, W, H);
+      ctx!.fillStyle = "#fff";
+      ctx!.font = "bold 40px monospace";
+      ctx!.textAlign = "center";
+      ctx!.textBaseline = "middle";
+      ctx!.fillText(message, W / 2, H / 2 - 16);
+      ctx!.fillStyle = "rgba(255,255,255,0.65)";
+      ctx!.font = "14px monospace";
+      ctx!.fillText(`PUNTUACIÓN: ${score}`, W / 2, H / 2 + 24);
+      ctx!.font = "12px monospace";
+      ctx!.fillText("ESPACIO PARA REINICIAR", W / 2, H / 2 + 48);
+    }
+
+    function draw() {
+      const skin = skinRef.current;
+      ctx!.fillStyle = skin.background;
+      ctx!.fillRect(0, 0, W, H);
+
+      for (const block of blocks) if (block.alive) drawBlock(block);
+      for (const exp of explosions) drawExplosion(exp);
+
+      drawPaddle();
+      drawBall();
+
+      if (gameState === "gameover") drawOverlay("GAME OVER");
+      if (gameState === "win") drawOverlay("¡NIVEL MÁXIMO SUPERADO!");
+      else if (pausedRef.current && gameState === "playing") {
+        ctx!.fillStyle = "rgba(10,10,20,0.75)";
+        ctx!.fillRect(0, 0, W, H);
+        ctx!.textAlign = "center";
+        ctx!.fillStyle = "#fff";
+        ctx!.font = "bold 32px monospace";
+        ctx!.fillText("PAUSA", W / 2, H / 2);
+      }
+
+      if (skin.effect === "scanlines") drawScanlines();
+    }
+
+    let lastReportedHud: ArkanoidHud | null = null;
+    function reportHud() {
+      if (!onHudRef.current) return;
+      if (
+        lastReportedHud &&
+        lastReportedHud.score === score &&
+        lastReportedHud.lives === lives &&
+        lastReportedHud.level === currentLevel
+      )
+        return;
+      lastReportedHud = { score, lives, level: currentLevel };
+      onHudRef.current(lastReportedHud);
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key in keys) {
+        e.preventDefault();
+        keys[e.key] = true;
+      }
+      if (gameState !== "playing" && e.code === "Space") {
+        init();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key in keys) keys[e.key] = false;
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
+    const movePaddleToClientX = (clientX: number) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const x = (clientX - rect.left) * scaleX;
+      paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w / 2));
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (pausedRef.current) return;
+      movePaddleToClientX(e.clientX);
+    };
+    canvas.addEventListener("mousemove", onMouseMove);
+
+    const onTouchDrag = (e: TouchEvent) => {
+      if (pausedRef.current) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+      movePaddleToClientX(touch.clientX);
+    };
+    canvas.addEventListener("touchstart", onTouchDrag, { passive: true });
+    canvas.addEventListener("touchmove", onTouchDrag, { passive: true });
+
+    let lastTime: number | null = null;
+    let rafId: number;
+
+    function loop(ts: number) {
+      const dt = lastTime === null ? 0 : (ts - lastTime) / 1000;
+      lastTime = ts;
+
+      if (!pausedRef.current) update(dt);
+      draw();
+      reportHud();
+
+      rafId = requestAnimationFrame(loop);
+    }
+
+    init();
+    rafId = requestAnimationFrame(loop);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      canvas.removeEventListener("mousemove", onMouseMove);
+      canvas.removeEventListener("touchstart", onTouchDrag);
+      canvas.removeEventListener("touchmove", onTouchDrag);
+    };
+  }, []);
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        width={W}
+        height={H}
+        style={{ display: "block", background: "#0a0a12", touchAction: "none" }}
+      />
+      <TouchControls
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        actions={[{ code: "Space", label: "⟳", color: "#4d7dff" }]}
+      />
+    </>
+  );
+}

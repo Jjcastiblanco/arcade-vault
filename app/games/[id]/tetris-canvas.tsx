@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { SKINS, DEFAULT_SKIN, type SkinTokens } from "@/lib/skins";
+import { TouchControls } from "./touch-controls";
 
 const COLS = 10;
 const ROWS = 20;
@@ -78,16 +80,19 @@ export type TetrisHud = { score: number; lines: number; level: number };
 export default function TetrisCanvas({
   paused = false,
   onHud,
+  skin = SKINS.caida[DEFAULT_SKIN],
   onGameOver,
 }: {
   paused?: boolean;
   onHud?: (hud: TetrisHud) => void;
+  skin?: SkinTokens;
   onGameOver?: (score: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const nextCanvasRef = useRef<HTMLCanvasElement>(null);
   const pausedRef = useRef(paused);
   const onHudRef = useRef(onHud);
+  const skinRef = useRef(skin);
   const onGameOverRef = useRef(onGameOver);
 
   useEffect(() => {
@@ -97,6 +102,10 @@ export default function TetrisCanvas({
   useEffect(() => {
     onHudRef.current = onHud;
   }, [onHud]);
+
+  useEffect(() => {
+    skinRef.current = skin;
+  }, [skin]);
 
   useEffect(() => {
     onGameOverRef.current = onGameOver;
@@ -258,7 +267,7 @@ export default function TetrisCanvas({
       const color = COLORS[colorIndex] as string;
       context.globalAlpha = alpha ?? 1;
       context.shadowColor = color;
-      context.shadowBlur = 10;
+      context.shadowBlur = skinRef.current.effect === "none" ? 0 : 10;
       context.fillStyle = color;
       context.fillRect(x * size + 2, y * size + 2, size - 4, size - 4);
       context.shadowBlur = 0;
@@ -270,8 +279,13 @@ export default function TetrisCanvas({
       context.globalAlpha = 1;
     }
 
+    function drawScanlines() {
+      ctx!.fillStyle = "rgba(0,0,0,0.15)";
+      for (let y = 0; y < H; y += 4) ctx!.fillRect(0, y, W, 2);
+    }
+
     function drawGrid() {
-      ctx!.strokeStyle = "#22222e";
+      ctx!.strokeStyle = skinRef.current.accent + "33";
       ctx!.lineWidth = 0.5;
       for (let c = 1; c < COLS; c++) {
         ctx!.beginPath();
@@ -288,7 +302,7 @@ export default function TetrisCanvas({
     }
 
     function draw() {
-      ctx!.fillStyle = "#1a1a25";
+      ctx!.fillStyle = skinRef.current.background;
       ctx!.fillRect(0, 0, W, H);
       drawGrid();
 
@@ -327,10 +341,12 @@ export default function TetrisCanvas({
         ctx!.font = "bold 24px monospace";
         ctx!.fillText("PAUSA", W / 2, H / 2);
       }
+
+      if (skinRef.current.effect === "scanlines") drawScanlines();
     }
 
     function drawNext() {
-      nextCtx!.fillStyle = "#1a1a25";
+      nextCtx!.fillStyle = skinRef.current.background;
       nextCtx!.fillRect(0, 0, NEXT_W, NEXT_H);
       const shape = next.shape;
       const offX = Math.floor((4 - shape[0].length) / 2);
@@ -428,96 +444,100 @@ export default function TetrisCanvas({
   }, []);
 
   return (
-    <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-      <canvas
-        ref={canvasRef}
-        width={W}
-        height={H}
-        style={{ display: "block", background: "#1a1a25" }}
-      />
-      <div
-        style={{
-          width: 190,
-          display: "flex",
-          flexDirection: "column",
-          gap: 24,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.15em",
-              color: "var(--ink-faint)",
-              marginBottom: 6,
-            }}
-          >
-            SIGUIENTE
+    <>
+      <div className="tetris-layout">
+        <canvas
+          ref={canvasRef}
+          width={W}
+          height={H}
+          style={{ display: "block", background: "#1a1a25" }}
+        />
+        <div className="tetris-sidebar">
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                color: "var(--ink-faint)",
+                marginBottom: 6,
+              }}
+            >
+              SIGUIENTE
+            </div>
+            <canvas
+              ref={nextCanvasRef}
+              width={NEXT_W}
+              height={NEXT_H}
+              style={{
+                display: "block",
+                background: "#1a1a25",
+                border: "1px solid #2a2a3a",
+                borderRadius: 4,
+              }}
+            />
           </div>
-          <canvas
-            ref={nextCanvasRef}
-            width={NEXT_W}
-            height={NEXT_H}
-            style={{
-              display: "block",
-              background: "#1a1a25",
-              border: "1px solid #2a2a3a",
-              borderRadius: 4,
-            }}
-          />
-        </div>
 
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.15em",
-              color: "var(--ink-faint)",
-              marginBottom: 10,
-            }}
-          >
-            CONTROLES
-          </div>
-          <ul
-            style={{
-              listStyle: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              fontSize: 12,
-              color: "#888",
-            }}
-          >
-            {[
-              ["← →", "mover"],
-              ["↑", "rotar"],
-              ["↓", "bajar"],
-              ["Espacio", "caída"],
-            ].map(([key, label]) => (
-              <li
-                key={label}
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-              >
-                <kbd
-                  style={{
-                    background: "#22223a",
-                    border: "1px solid #3a3a5a",
-                    borderRadius: 3,
-                    padding: "2px 8px",
-                    fontSize: 11,
-                    color: "#aaa",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                color: "var(--ink-faint)",
+                marginBottom: 10,
+              }}
+            >
+              CONTROLES
+            </div>
+            <ul
+              style={{
+                listStyle: "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                fontSize: 12,
+                color: "#888",
+              }}
+            >
+              {[
+                ["← →", "mover"],
+                ["↑", "rotar"],
+                ["↓", "bajar"],
+                ["Espacio", "caída"],
+              ].map(([key, label]) => (
+                <li
+                  key={label}
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
                 >
-                  {key}
-                </kbd>
-                {label}
-              </li>
-            ))}
-          </ul>
+                  <kbd
+                    style={{
+                      background: "#22223a",
+                      border: "1px solid #3a3a5a",
+                      borderRadius: 3,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      color: "#aaa",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {key}
+                  </kbd>
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
-    </div>
+      <TouchControls
+        left={{ code: "ArrowLeft", label: "◄" }}
+        right={{ code: "ArrowRight", label: "►" }}
+        down={{ code: "ArrowDown", label: "▼" }}
+        actions={[
+          { code: "ArrowUp", label: "⟳", color: "#4d7dff" },
+          { code: "Space", label: "CAÍDA", color: "#e64545" },
+        ]}
+      />
+    </>
   );
 }
